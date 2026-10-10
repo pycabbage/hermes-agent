@@ -481,6 +481,7 @@ def delegate_task(
     output_schema: Optional[dict[str, Any]] = None, images: Optional[list[str]] = None, action: Optional[str] = None,
     subagent_id: Optional[str] = None, message: Optional[str] = None, parent_agent=None,
     credentials_cfg: Optional[dict[str, Any]] = None,
+    provider: Optional[str] = None, model: Optional[str] = None,
 ) -> str:
     """Spawn child agents (single ``goal`` or ``tasks=[...]`` batch) or control running ones. ``action``
     list/steer/stop run synchronously and bypass the pause gate, depth limit and async dispatch. ``role`` is legacy
@@ -529,6 +530,9 @@ def delegate_task(
     # a per-call routing owner shaped like the delegation config section. Keep
     # the route and its fallback policy together through child construction.
     routing_cfg = credentials_cfg if credentials_cfg is not None else cfg
+    # Per-call provider/model win over delegation.provider/model; both fall back to parent inheritance downstream.
+    if provider or model:
+        routing_cfg = {**routing_cfg, **{k: v for k, v in (("provider", provider), ("model", model)) if v}}
     try:
         creds = _resolve_delegation_credentials(routing_cfg, parent_agent)
     except ValueError as exc:
@@ -755,6 +759,8 @@ DELEGATE_TASK_SCHEMA = {
                 enum=["spawn", "list", "steer", "stop"],
             ),
             "subagent_id": _p("string", "Target for action='steer'/'stop' (ids from the spawn response or action='list')."),
+            "provider": _p("string", "Optional provider override for ALL children of this call (beats delegation.provider; else inherits parent)."),
+            "model": _p("string", "Optional model override for ALL children of this call (beats delegation.model; else inherits parent)."),
             "message": _p(
                 "string",
                 "For action='steer': the course correction, appended to "
@@ -794,6 +800,7 @@ registry.register(
         goal=args.get("goal"), context=args.get("context"), tasks=_strip_model_hidden_task_fields(args.get("tasks")),
         max_iterations=args.get("max_iterations"), role=args.get("role"),
         background=_model_background_value(args, kw.get("parent_agent")), output_schema=args.get("output_schema"),
+        provider=args.get("provider"), model=args.get("model"),
         images=args.get("images"), action=args.get("action"), subagent_id=args.get("subagent_id"), message=args.get("message"),
         parent_agent=kw.get("parent_agent"),
     ),
