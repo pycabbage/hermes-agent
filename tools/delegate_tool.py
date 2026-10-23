@@ -554,6 +554,7 @@ def delegate_task(
     output_schema: Optional[dict[str, Any]] = None, images: Optional[list[str]] = None, action: Optional[str] = None,
     subagent_id: Optional[str] = None, message: Optional[str] = None, parent_agent=None,
     credentials_cfg: Optional[dict[str, Any]] = None,
+    provider: Optional[str] = None, model: Optional[str] = None,
 ) -> str:
     """Spawn child agents (single ``goal`` or ``tasks=[...]`` batch) or control running ones. ``action``
     list/steer/stop run synchronously and bypass the pause gate, depth limit and async dispatch. ``role`` is legacy
@@ -598,6 +599,14 @@ def delegate_task(
             "delegate_task: ignoring caller-supplied max_iterations=%s; using delegation.max_iterations=%s from config",
             max_iterations, default_max_iter,
         )
+    # Per-call provider/model win over delegation.provider/model (or credentials_cfg); both fall back to parent
+    # inheritance downstream. The overridden config feeds the route resolution below.
+    route_override = {k: v for k, v in (("provider", provider), ("model", model)) if v}
+    if route_override:
+        if credentials_cfg is not None:
+            credentials_cfg = {**credentials_cfg, **route_override}
+        else:
+            cfg = {**cfg, **route_override}
     max_children = _get_max_concurrent_children()
     task_list, err = _normalize_task_list(goal, context, tasks, output_schema, top_role, max_children)
     if not err:
@@ -843,6 +852,8 @@ DELEGATE_TASK_SCHEMA = {
                 enum=["spawn", "list", "steer", "stop"],
             ),
             "subagent_id": _p("string", "Target for action='steer'/'stop' (ids from the spawn response or action='list')."),
+            "provider": _p("string", "Optional provider override for ALL children of this call (beats delegation.provider; else inherits parent)."),
+            "model": _p("string", "Optional model override for ALL children of this call (beats delegation.model; else inherits parent)."),
             "message": _p(
                 "string",
                 "For action='steer': the course correction, appended to "
@@ -882,6 +893,7 @@ registry.register(
         goal=args.get("goal"), context=args.get("context"), tasks=_strip_model_hidden_task_fields(args.get("tasks")),
         max_iterations=args.get("max_iterations"), role=args.get("role"),
         background=_model_background_value(args, kw.get("parent_agent")), output_schema=args.get("output_schema"),
+        provider=args.get("provider"), model=args.get("model"),
         images=args.get("images"), action=args.get("action"), subagent_id=args.get("subagent_id"), message=args.get("message"),
         parent_agent=kw.get("parent_agent"),
     ),
