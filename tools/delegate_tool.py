@@ -796,8 +796,9 @@ _DESCRIPTION_HEAD = (
     "- Mechanical multi-step work with no reasoning needed -> execute_code\n"
     "- A single tool call -> call the tool directly\n"
     "- Tasks needing user interaction -> subagents cannot ask questions\n"
-    "- Durable work that must survive this session -> cronjob or terminal(background=True, notify=True); /stop, /new, "
-    "or process exit halts running subagents (whole tree); each returns an 'interrupted' completion with partial output.\n\n"
+    "- Durable work that must survive this session -> cronjob or terminal(background=True, notify=True, "
+    "persist_on_release=True); /stop, /new, or process exit halts running subagents (whole tree); each returns an "
+    "'interrupted' completion with partial output.\n\n"
     "RULES:\n"
     "- Children know nothing of this conversation: pass everything needed via 'context', including any required "
     "output language, tone, or style (e.g. \"respond in Chinese\").\n"
@@ -932,8 +933,8 @@ DELEGATE_TASK_SCHEMA = {
             "model": _p("string", "Optional model override for ALL children of this call (beats delegation.model; else inherits parent)."),
             "message": _p(
                 "string",
-                "Required for action='steer': the course correction, appended to "
-                "the child's next tool result mid-run. Be directive and specific. "
+                "Required for action='steer': the course correction, delivered to the child as a user "
+                "message after its current tool calls. Be directive and specific. "
                 "For 'continue': the child's next instruction.",
             ),
         },
